@@ -860,6 +860,27 @@
           extra_start_month_index: $("extra_start_month_index"),
         };
 
+        const percentInputIds = ["rate_apr", "pmi_pct", "upfront_fee_pct", "annual_mi_pct"];
+        const percentInputSet = new Set(percentInputIds);
+
+        const formatPercentValue = (value) => {
+          const num = toNumber(value);
+          if (!Number.isFinite(num)) return "";
+          return num.toFixed(2);
+        };
+
+        const normalizePercentInput = (el) => {
+          if (!el) return;
+          const formatted = formatPercentValue(el.value);
+          if (formatted !== "") {
+            el.value = formatted;
+          }
+        };
+
+        const normalizePercentInputs = () => {
+          percentInputIds.forEach((id) => normalizePercentInput(inputs[id]));
+        };
+
         const outputs = {
           total_monthly_0: $("total_monthly_0"),
           p_and_i: $("p_and_i"),
@@ -879,9 +900,10 @@
             if (inputs[key].type === "checkbox") {
               inputs[key].checked = Boolean(value);
             } else {
-              inputs[key].value = value;
+              inputs[key].value = percentInputSet.has(key) ? formatPercentValue(value) : value;
             }
           });
+          normalizePercentInputs();
         };
 
         const mergeProgramDefaults = () => {
@@ -894,9 +916,10 @@
               inputs[key].checked = Boolean(value);
             } else {
               // Always update program-specific fields (pmi_pct, upfront_fee_pct, annual_mi_pct)
-              inputs[key].value = value;
+              inputs[key].value = percentInputSet.has(key) ? formatPercentValue(value) : value;
             }
           });
+          normalizePercentInputs();
         };
 
         const readParams = () => ({
@@ -1022,7 +1045,12 @@
         });
 
         Object.values(inputs).forEach((el) => {
-          const handler = () => calculateAndRender();
+          const handler = () => {
+            if (percentInputSet.has(el.id)) {
+              normalizePercentInput(el);
+            }
+            calculateAndRender();
+          };
           el.addEventListener("change", handler);
           if (el.tagName === "INPUT" && el.type === "number") {
             el.addEventListener("keyup", (evt) => {
