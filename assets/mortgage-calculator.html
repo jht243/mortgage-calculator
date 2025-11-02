@@ -58,10 +58,29 @@
       }
 
       label {
-        display: grid;
+        display: flex;
+        flex-direction: column;
         gap: 6px;
         font-size: 13px;
         color: rgba(226, 232, 240, 0.86);
+      }
+
+      .percent-field {
+        position: relative;
+      }
+
+      .percent-field input[type="number"] {
+        padding-right: 42px;
+      }
+
+      .percent-field::after {
+        content: "%";
+        position: absolute;
+        right: 14px;
+        top: 34px;
+        font-size: 13px;
+        color: rgba(226, 232, 240, 0.7);
+        pointer-events: none;
       }
 
       input[type="number"],
@@ -277,9 +296,9 @@
             Down payment ($)
             <input type="number" id="down_payment_value" min="0" step="1000" />
           </label>
-          <label>
+          <label class="percent-field">
             Rate (APR %)
-            <input type="number" id="rate_apr" min="0" step="0.001" />
+            <input type="number" id="rate_apr" min="0" step="0.01" />
           </label>
           <label>
             Term (years)
@@ -287,76 +306,6 @@
           </label>
         </div>
       </section>
-
-      <section>
-        <div class="section-title">Start date & taxes</div>
-        <div class="grid">
-          <label>
-            First payment month
-            <input type="number" id="start_month" min="1" max="12" step="1" />
-          </label>
-          <label>
-            First payment year
-            <input type="number" id="start_year" min="2024" step="1" />
-          </label>
-          <label>
-            Property tax input (≤20 = % of value)
-            <input type="number" id="property_tax_input" min="0" step="0.01" />
-          </label>
-          <label>
-            Homeowners insurance ($/yr)
-            <input type="number" id="homeowners_insurance_yearly" min="0" step="50" />
-          </label>
-          <label>
-            HOA dues ($/mo)
-            <input type="number" id="hoa_monthly" min="0" step="10" />
-          </label>
-        </div>
-      </section>
-
-      <section>
-        <div class="section-title">Mortgage insurance & fees</div>
-        <div class="grid">
-          <label>
-            PMI (% annual, conventional)
-            <input type="number" id="pmi_pct" min="0" step="0.01" />
-          </label>
-          <label>
-            Upfront fee (% base loan)
-            <input type="number" id="upfront_fee_pct" min="0" step="0.01" />
-          </label>
-          <label>
-            Annual MI fee (% of balance)
-            <input type="number" id="annual_mi_pct" min="0" step="0.01" />
-          </label>
-          <label>
-            Finance upfront fee?
-            <div class="checkbox-row">
-              <input type="checkbox" id="finance_upfront_fee" />
-              <span style="font-size: 12px; color: rgba(226, 232, 240, 0.72);">Add fee to principal balance</span>
-            </div>
-          </label>
-        </div>
-      </section>
-
-      <section>
-        <div class="section-title">Extra principal</div>
-        <div class="grid">
-          <label>
-            Extra payment ($/mo)
-            <input type="number" id="extra_principal_monthly" min="0" step="50" />
-          </label>
-          <label>
-            Extra starts at month index
-            <input type="number" id="extra_start_month_index" min="0" step="1" />
-          </label>
-        </div>
-      </section>
-
-      <div class="actions">
-        <button id="calculateBtn">Recalculate</button>
-        <button class="secondary" id="resetBtn" type="button">Reset defaults</button>
-      </div>
 
       <section>
         <div class="cards">
