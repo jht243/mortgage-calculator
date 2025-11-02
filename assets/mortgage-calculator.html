@@ -766,6 +766,7 @@
           monthly_mi,
           amortize_monthly,
           summarize_outputs,
+          calculate_mortgage,
         });
 
         globalThis.mortgageCalculator = mortgageCalculator;
@@ -922,7 +923,7 @@
           outputs.total_interest.textContent = formatCurrency(totals.total_interest);
           outputs.payoff_date.textContent = payoffLabel;
 
-          const totalExtraPrincipal = schedule.reduce((sum, row) => sum + row.extra_principal, 0);
+          const totalExtraPrincipal = calc.schedule.reduce((sum, row) => sum + row.extra_principal, 0);
 
           outputs.interest_hint.textContent = `Totals include ${formatCurrency(
             totals.total_principal - totalExtraPrincipal
