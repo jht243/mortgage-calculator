@@ -7,6 +7,8 @@
       :root {
         color-scheme: dark;
         font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --nav-offset: clamp(6px, 2vw, 14px);
+        --app-pad-x: clamp(12px, 4vw, 24px);
       }
 
       body {
@@ -22,9 +24,9 @@
 
       .app {
         width: 100%;
-        max-width: 720px;
+        max-width: 100%;
         margin: 0 auto;
-        padding: 0 24px 32px;
+        padding: 0 var(--app-pad-x) 32px;
         display: grid;
         gap: 18px;
         background: transparent;
@@ -329,11 +331,11 @@
       }
 
       #cardPrev {
-        left: 6px;
+        left: var(--nav-offset);
       }
 
       #cardNext {
-        right: 6px;
+        right: var(--nav-offset);
       }
 
       .carousel-window {
@@ -343,12 +345,13 @@
 
       .carousel-track {
         display: flex;
-        width: 100%;
         transition: transform 0.35s ease-in-out;
+        will-change: transform;
       }
 
       .carousel-slide {
         min-width: 100%;
+        flex: 0 0 100%;
         padding: 4px 0;
         display: flex;
         justify-content: center;
@@ -357,7 +360,7 @@
 
       .slide-content {
         width: 100%;
-        max-width: 760px;
+        max-width: 100%;
         margin: 0 auto;
         display: grid;
         gap: 16px;
@@ -535,6 +538,11 @@
         gap: 10px 18px;
         font-size: 13px;
         color: rgba(148, 163, 184, 0.9);
+        background: linear-gradient(135deg, rgba(25, 28, 48, 0.7), rgba(20, 23, 42, 0.75));
+        border: 1px solid rgba(71, 85, 105, 0.25);
+        border-radius: 12px;
+        padding: 14px;
+        box-shadow: 0 4px 12px rgba(10, 13, 28, 0.35);
       }
 
       .totals-item {
@@ -710,6 +718,16 @@
         color: rgba(226, 232, 240, 0.6);
       }
 
+      /* Make amortization schedule container match secondary cards */
+      #schedulePreview {
+        background: linear-gradient(135deg, rgba(25, 28, 48, 0.7), rgba(20, 23, 42, 0.75));
+        border: 1px solid rgba(71, 85, 105, 0.25);
+        border-radius: 12px;
+        padding: 14px;
+        box-shadow: 0 4px 12px rgba(10, 13, 28, 0.35);
+        overflow: auto;
+      }
+
       @keyframes glow {
         0% {
           box-shadow: 0 0 0 rgba(56, 189, 248, 0);
@@ -724,6 +742,16 @@
 
       .glow-animate {
         animation: glow 1s ease-in-out;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .glow-animate {
+          animation: none !important;
+        }
+        .carousel-track,
+        .carousel-nav {
+          transition: none !important;
+        }
       }
 
       @media (max-width: 560px) {
@@ -765,11 +793,11 @@
   </head>
   <body>
     <div class="app">
-      <section class="result-carousel">
-        <button class="carousel-nav" id="cardPrev" aria-label="Previous card">&#x2039;</button>
-        <div class="carousel-window">
+      <section class="result-carousel" role="region" aria-roledescription="carousel" aria-label="Mortgage calculator">
+        <button class="carousel-nav" id="cardPrev" aria-label="Previous card" aria-controls="resultTrack">&#x2039;</button>
+        <div class="carousel-window" tabindex="0">
           <div class="carousel-track" id="resultTrack">
-            <div class="carousel-slide" data-card="summary">
+            <div class="carousel-slide" data-card="summary" role="group" aria-roledescription="slide" aria-label="Summary" aria-hidden="false">
               <div class="slide-content">
                 <header class="slide-header">
                   <h2>Mortgage Calculator</h2>
@@ -920,7 +948,7 @@
                       <span class="label">Monthly payment (month 0)</span>
                       <span class="badge">All-in payment</span>
                     </div>
-                    <span class="value" id="total_monthly_0">$0</span>
+                    <span class="value" id="total_monthly_0" aria-live="polite">$0</span>
                     <span class="hint">Includes P&I, MI, taxes, insurance, HOA (excludes extra principal).</span>
                   </div>
                   <div class="quick-metrics">
@@ -948,7 +976,7 @@
                 </div>
               </div>
             </div>
-            <div class="carousel-slide" data-card="breakdown">
+            <div class="carousel-slide" data-card="breakdown" role="group" aria-roledescription="slide" aria-label="Monthly breakdown" aria-hidden="true">
               <div class="slide-content breakdown">
                 <header class="slide-header">
                   <h2>Monthly payment breakdown</h2>
@@ -1009,7 +1037,7 @@
                 </div>
               </div>
             </div>
-            <div class="carousel-slide" data-card="amortization">
+            <div class="carousel-slide" data-card="amortization" role="group" aria-roledescription="slide" aria-label="Amortization & totals" aria-hidden="true">
               <div class="slide-content tight">
                 <header class="slide-header">
                   <h2>Amortization & totals</h2>
@@ -1024,7 +1052,7 @@
             </div>
           </div>
         </div>
-        <button class="carousel-nav" id="cardNext" aria-label="Next card">&#x203A;</button>
+        <button class="carousel-nav" id="cardNext" aria-label="Next card" aria-controls="resultTrack">&#x203A;</button>
       </section>
     </div>
 
@@ -1922,11 +1950,39 @@
           const clamped = Math.max(0, Math.min(carousel.index, carousel.slides.length - 1));
           const changed = clamped !== lastCarouselIndex;
           carousel.index = clamped;
-          const offsetPercent = -(clamped * 100);
-          carousel.track.style.transform = `translateX(${offsetPercent}%)`;
-          if (carousel.prev) carousel.prev.disabled = clamped === 0;
-          if (carousel.next) carousel.next.disabled = clamped === carousel.slides.length - 1;
+          const viewportWidth = carousel.track.parentElement ? carousel.track.parentElement.getBoundingClientRect().width : 0;
+          carousel.track.style.transform = `translateX(${-(clamped * viewportWidth)}px)`;
+
+          if (carousel.prev) {
+            const disabled = clamped === 0;
+            carousel.prev.disabled = disabled;
+            carousel.prev.setAttribute("aria-disabled", String(disabled));
+          }
+          if (carousel.next) {
+            const disabled = clamped === carousel.slides.length - 1;
+            carousel.next.disabled = disabled;
+            carousel.next.setAttribute("aria-disabled", String(disabled));
+          }
+
+          // Reflect visible slide for screen readers
+          carousel.slides.forEach((slide, idx) => {
+            const isCurrent = idx === clamped;
+            slide.setAttribute("aria-hidden", String(!isCurrent));
+            if (isCurrent) slide.setAttribute("aria-current", "true");
+            else slide.removeAttribute("aria-current");
+          });
+
           persistCarouselIndex();
+
+          // Persist widget state in host if available
+          try {
+            if (window?.openai?.setWidgetState) {
+              window.openai.setWidgetState({ carouselIndex: clamped });
+            }
+          } catch (_) {
+            /* ignore */
+          }
+
           if (!isInitialCarouselSync && changed) {
             const cardId = carousel.slides[clamped]?.dataset.card || "unknown";
             emitTelemetry("carousel_navigated", { index: clamped, card: cardId });
@@ -1972,6 +2028,7 @@
         loadCarouselIndex();
         updateMiVisibility();
         updateCarousel();
+        window.addEventListener("resize", updateCarousel);
 
         const carouselWindowEl = document.querySelector(".carousel-window");
         let pointerStartX = null;
@@ -2044,6 +2101,9 @@
         setDefaults(baseDefaults);
         mergeProgramDefaults();
         calculateAndRender();
+
+        // Component loaded telemetry (Apps SDK guidance)
+        emitTelemetry("component_loaded", { slides: carousel.slides.length });
       })();
     </script>
   </body>
