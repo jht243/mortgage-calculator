@@ -9,7 +9,6 @@
         font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         --nav-offset: clamp(6px, 2vw, 14px);
         --app-pad-x: clamp(12px, 4vw, 24px);
-        --breakdown-panel-h: clamp(250px, 42vh, 320px);
       }
 
       body {
@@ -388,7 +387,7 @@
 
       .breakdown-layout {
         display: grid;
-        grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+        grid-template-columns: 0.9fr 1.1fr;
         gap: 16px;
         align-items: stretch;
       }
@@ -400,7 +399,6 @@
         border-radius: 12px;
         padding: 24px;
         box-shadow: 0 4px 12px rgba(10, 13, 28, 0.35);
-        min-height: var(--breakdown-panel-h);
       }
 
       .breakdown-chart {
@@ -408,15 +406,16 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: var(--breakdown-panel-h);
         background: transparent;
         border: none;
         box-shadow: none;
       }
 
       .breakdown-chart canvas {
-        width: 200px;
-        height: 200px;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1 / 1;
+        display: block;
       }
 
       .breakdown-chart .chart-value {
@@ -441,9 +440,7 @@
       .breakdown-list {
         display: grid;
         gap: 8px;
-        align-content: start;
-        height: var(--breakdown-panel-h);
-        max-height: var(--breakdown-panel-h);
+        align-content: stretch;
         overflow: hidden;
         grid-template-rows: repeat(var(--rows, 5), 1fr);
       }
@@ -1003,7 +1000,7 @@
                 <div class="breakdown-card">
                   <div class="breakdown-panel breakdown-layout">
                     <div class="breakdown-chart">
-                      <canvas id="breakdownChart" width="220" height="220"></canvas>
+                      <canvas id="breakdownChart"></canvas>
                       <div class="chart-value" id="chartTotal">
                         $0<span>/mo</span>
                       </div>
@@ -1834,12 +1831,22 @@
           canvas: $("breakdownChart"),
         };
 
+        const fitCanvasToParent = (canvas) => {
+          const rect = canvas.getBoundingClientRect();
+          const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+          const size = Math.max(140, Math.round(rect.width * dpr));
+          if (canvas.width !== size || canvas.height !== size) {
+            canvas.width = size;
+            canvas.height = size;
+          }
+        };
+
         const drawDonutChart = (ctx, data, colors) => {
           const canvas = ctx.canvas;
           const centerX = canvas.width / 2;
           const centerY = canvas.height / 2;
-          const radius = 85;
-          const holeRadius = 65;
+          const radius = Math.min(canvas.width, canvas.height) * 0.42;
+          const holeRadius = radius * 0.76;
 
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1909,6 +1916,7 @@
             breakdownOutputs.chartTotal.innerHTML = `${formatCurrency(total)}<span>/mo</span>`;
           }
           
+          fitCanvasToParent(breakdownOutputs.canvas);
           const ctx = breakdownOutputs.canvas.getContext("2d");
           const data = [p_and_i, tax_monthly, ins_monthly, hoa_monthly];
           if (mi > 0) data.push(mi);
@@ -2061,6 +2069,10 @@
         updateMiVisibility();
         updateCarousel();
         window.addEventListener("resize", updateCarousel);
+        window.addEventListener("resize", () => {
+          if (breakdownOutputs.canvas) fitCanvasToParent(breakdownOutputs.canvas);
+          calculateAndRender();
+        });
 
         const carouselWindowEl = document.querySelector(".carousel-window");
         let pointerStartX = null;
