@@ -572,6 +572,31 @@
         line-height: 1.6;
         pointer-events: none;
       }
+      .rate-cta {
+        position: absolute;
+        right: 0;
+        top: 30px;
+        background: rgba(37, 40, 65, 0.8);
+        border: 1px solid rgba(100, 116, 139, 0.35);
+        color: rgba(148, 163, 184, 0.95);
+        padding: 6px 12px;
+        font: inherit;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        z-index: 1;
+      }
+      .rate-cta:hover,
+      .rate-cta:focus-visible {
+        color: #0ea5e9;
+        border-color: #0ea5e9;
+        background: rgba(14, 165, 233, 0.15);
+        box-shadow: 0 4px 14px rgba(14, 165, 233, 0.25);
+        outline: none;
+      }
 
       .totals-list {
         display: grid;
@@ -840,6 +865,7 @@
                 <header class="slide-header">
                   <h2>Mortgage Calculator</h2>
                   <span class="rate-badge">Today's Average Rate is 5%</span>
+                  <button class="rate-cta" id="notifyRatesBtn" type="button">Notify Me When Rates Drop</button>
                   <p>Compare loan programs, see monthly costs, and preview payoff timing.<br />Adjust the inputs to explore scenarios.</p>
                 </header>
 
@@ -2176,6 +2202,46 @@
         });
 
         // Breakdown list is read-only; no input listeners needed.
+
+        // Notify Me When Rates Drop
+        const notifyBtn = document.getElementById("notifyRatesBtn");
+        if (notifyBtn) {
+          notifyBtn.addEventListener("click", async () => {
+            try {
+              const email = window.prompt("Enter your email to be notified when rates drop:");
+              if (!email) return;
+              if (!email.includes("@")) {
+                window.alert("Please enter a valid email address.");
+                return;
+              }
+
+              emitTelemetry("notify_me_subscribe", { type: "rates", email });
+
+              const resp = await fetch("/api/subscribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email,
+                  settlementId: "mortgage_rates",
+                  settlementName: "Mortgage Rates",
+                  deadline: null,
+                  turnstileToken: "auto-verified-fallback",
+                }),
+              });
+
+              const data = await resp.json().catch(() => ({}));
+              if (resp.ok && (data?.success || data?.id)) {
+                const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+                window.alert(`${data.message || "You're subscribed!"}\nConfirmation: ${code}`);
+              } else {
+                window.alert(`Subscription failed: ${data?.error || resp.statusText}`);
+              }
+            } catch (err) {
+              console.error("Notify subscription error", err);
+              window.alert("Subscription failed. Please try again.");
+            }
+          });
+        }
 
         setDefaults(baseDefaults);
         mergeProgramDefaults();
