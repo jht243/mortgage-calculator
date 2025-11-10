@@ -922,7 +922,7 @@
               <div class="slide-content">
                 <header class="slide-header">
                   <h2>Mortgage Calculator</h2>
-                  <span class="rate-badge"><span class="rate-label">Today's Average Rate</span> <span class="rate-num">5%</span></span>
+                  <span class="rate-badge"><span class="rate-label">Today's Average Rate</span> <span class="rate-num"></span></span>
                   <button class="rate-cta" id="notifyRatesBtn" type="button" aria-label="Notify me when rates drop">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2Z"/></svg>
                     Notify Me When Rates Drop
@@ -2374,6 +2374,7 @@
           if (!numEl) return false;
           const text = `${val}%`;
           if (numEl.textContent !== text) numEl.textContent = text;
+          try { numEl.setAttribute('data-rate', String(val)); } catch (_) {}
           requestAnimationFrame(() => {
             if (typeof centerNotifyUnderRate === 'function') centerNotifyUnderRate();
           });
@@ -2411,16 +2412,20 @@
         };
 
         const refreshRateBadge = async (maxTries = 6) => {
+          try { emitTelemetry("rate_fetch_attempt", { maxTries }); } catch (_) {}
           for (let attempt = 0; attempt < maxTries; attempt++) {
             const val = await fetchRateOnce();
             if (val != null) {
+              try { emitTelemetry("rate_fetch_success", { attempt, value: val }); } catch (_) {}
               const applied = applyRateBadge(val);
               if (applied) guardRateBadge(`${val}%`, 12000);
               return;
             }
+            try { emitTelemetry("rate_fetch_retry", { attempt }); } catch (_) {}
             const delay = Math.min(8000, 500 * Math.pow(2, attempt));
             await new Promise((r) => setTimeout(r, delay));
           }
+          try { emitTelemetry("rate_fetch_failed", {}); } catch (_) {}
         };
 
         setDefaults(baseDefaults);
