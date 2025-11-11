@@ -557,10 +557,41 @@
         font-size: 13px;
         line-height: 1.5;
       }
-      .rate-badge {
+      .rate-indicator {
         position: absolute;
         top: 4px;
         right: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .rate-refresh {
+        appearance: none;
+        border: none;
+        padding: 4px;
+        border-radius: 999px;
+        background: rgba(14, 165, 233, 0.12);
+        color: rgba(14, 165, 233, 0.85);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.2s ease, background 0.2s ease;
+      }
+      .rate-refresh:hover { background: rgba(14, 165, 233, 0.18); }
+      .rate-refresh:focus-visible {
+        outline: 2px solid rgba(14, 165, 233, 0.65);
+        outline-offset: 2px;
+      }
+      .rate-refresh svg { width: 16px; height: 16px; }
+      .rate-refresh.is-spinning svg {
+        animation: rateRefreshSpin 0.9s linear infinite;
+      }
+      @keyframes rateRefreshSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .rate-badge {
         font-size: 11px;
         letter-spacing: 0.1em;
         text-transform: uppercase;
@@ -922,7 +953,14 @@
               <div class="slide-content">
                 <header class="slide-header">
                   <h2>Mortgage Calculator</h2>
-                  <span class="rate-badge"><span class="rate-label">Today's Average Rate</span> <span class="rate-num"></span></span>
+                  <div class="rate-indicator">
+                    <button class="rate-refresh" type="button" aria-label="Refresh today's average rate">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill="currentColor" d="M18.36 6.64A9 9 0 0 0 12 4v2a7 7 0 0 1 6.3 4H16l4 4 4-4h-2.29a9.004 9.004 0 0 0-3.35-3.36Zm-12.72 10.72A9 9 0 0 0 12 20v-2a7 7 0 0 1-6.3-4H8l-4-4-4 4h2.29a9.004 9.004 0 0 0 3.35 3.36Z"/>
+                      </svg>
+                    </button>
+                    <span class="rate-badge"><span class="rate-label">Today's Average Rate</span> <span class="rate-num"></span></span>
+                  </div>
                   <button class="rate-cta" id="notifyRatesBtn" type="button" aria-label="Notify me when rates drop">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2Z"/></svg>
                     Notify Me When Rates Drop
@@ -2433,7 +2471,32 @@
         calculateAndRender();
 
         // Fetch and display the latest daily rate from server (FRED + 0.5%)
-        refreshRateBadge();
+        let rateBadgeRefreshing = false;
+
+        const refreshRateBadgeWithState = async () => {
+          if (rateBadgeRefreshing) return;
+          rateBadgeRefreshing = true;
+          try {
+            await refreshRateBadge();
+          } finally {
+            rateBadgeRefreshing = false;
+          }
+        };
+
+        refreshRateBadgeWithState();
+
+        const rateRefreshBtn = document.querySelector('.rate-refresh');
+        if (rateRefreshBtn) {
+          rateRefreshBtn.addEventListener('click', async () => {
+            if (rateBadgeRefreshing) return;
+            rateRefreshBtn.classList.add('is-spinning');
+            try {
+              await refreshRateBadgeWithState();
+            } finally {
+              rateRefreshBtn.classList.remove('is-spinning');
+            }
+          });
+        }
 
         // Component loaded telemetry (Apps SDK guidance)
         emitTelemetry("component_loaded", { slides: carousel.slides.length });
