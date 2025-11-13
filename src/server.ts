@@ -69,12 +69,37 @@ async function handleExportPdf(req: IncomingMessage, res: ServerResponse) {
     let body = "";
     for await (const chunk of req) body += chunk;
     const payload = JSON.parse(body || "{}");
+    const ua = req.headers["user-agent"] || "";
     const params = payload?.params || {};
     const monthlyPayment = payload?.monthlyPayment;
     const chartPngDataUrl = payload?.chartPngDataUrl as string | undefined;
 
+    // Pre-flight debug logging
+    try {
+      const chartLen = typeof chartPngDataUrl === "string" ? chartPngDataUrl.length : 0;
+      console.log("[ExportPDF] request received", {
+        hasChart: Boolean(chartPngDataUrl && chartPngDataUrl.startsWith("data:image")),
+        chartLen,
+        monthlyPayment,
+        paramKeys: Object.keys(params || {}),
+        ua,
+      });
+      logAnalytics("export_pdf_request", {
+        hasChart: Boolean(chartPngDataUrl && chartPngDataUrl.startsWith("data:image")),
+        chartLen,
+        monthlyPayment,
+      });
+    } catch (_) {}
+
     // Prepare PDF
     const doc = new PDFDocument({ size: "LETTER", margin: 36 });
+    doc.on("error", (err) => {
+      console.error("[ExportPDF] PDF stream error", err);
+    });
+    doc.on("end", () => {
+      console.log("[ExportPDF] PDF stream finished");
+      try { logAnalytics("export_pdf_stream_end", {}); } catch (_) {}
+    });
     res.writeHead(200, {
       "Content-Type": "application/pdf",
       "Content-Disposition": "attachment; filename=Mortgage_Summary.pdf",
@@ -127,6 +152,7 @@ async function handleExportPdf(req: IncomingMessage, res: ServerResponse) {
       }
     }
 
+    console.log("[ExportPDF] finalizing PDF");
     doc.end();
   } catch (error) {
     console.error("Export PDF error:", error);
