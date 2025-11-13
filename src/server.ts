@@ -488,7 +488,7 @@ const toolInputParser = z.object({
 const tools: Tool[] = widgets.map((widget) => ({
   name: widget.id,
   description:
-    "Use this when you need a full mortgage-planning workspace that pulls live FRED rates, lets you adjust loan assumptions, and visualizes payments via charts and amortization tables. Do not use for unrelated financial products like auto loans or credit cards.",
+    "Open the free mortgage calculator tool. If the user asks generally (e.g., 'calculate my mortgage'), call this tool with an empty arguments object {} to open with defaults. If the user provides numbers, include any of: home_value, down_payment_value, rate_apr, term_years, loan_type.",
   inputSchema: toolInputSchema,
   outputSchema: {
     type: "object",
@@ -683,59 +683,115 @@ function createMortgageCalculatorServer(): Server {
 
         // If ChatGPT didn't pass structured arguments, try to infer key numbers from freeform text in meta
         try {
-          if (args.home_value === undefined || args.home_value === null) {
-            const candidates: any[] = [
-              meta["openai/userPrompt"],
-              meta["openai/userText"],
-              meta["openai/lastUserMessage"],
-              meta["openai/inputText"],
-              meta["openai/requestText"],
-            ];
-            const userText = candidates.find((t) => typeof t === "string" && t.trim().length > 0) || "";
-            if (userText) {
-              const parseAmountToNumber = (s: string): number | null => {
-                const lower = s.toLowerCase().replace(/[,$\s]/g, "").trim();
-                const m = lower.match(/^(\d+(?:\.\d+)?)(m)$/);
-                const k = lower.match(/^(\d+(?:\.\d+)?)(k)$/);
-                if (m) return Math.round(parseFloat(m[1]) * 1_000_000);
-                if (k) return Math.round(parseFloat(k[1]) * 1_000);
-                const n = Number(lower.replace(/[^0-9.]/g, ""));
-                return Number.isFinite(n) ? Math.round(n) : null;
-              };
+          const candidates: any[] = [
+            meta["openai/userPrompt"],
+            meta["openai/userText"],
+            meta["openai/lastUserMessage"],
+            meta["openai/inputText"],
+            meta["openai/requestText"],
+          ];
+          const userText = candidates.find((t) => typeof t === "string" && t.trim().length > 0) || "";
+          if (userText) {
+            const parseAmountToNumber = (s: string): number | null => {
+              const lower = s.toLowerCase().replace(/[,$\s]/g, "").trim();
+              const m = lower.match(/^(\d+(?:\.\d+)?)(m)$/);
+              const k = lower.match(/^(\d+(?:\.\d+)?)(k)$/);
+              if (m) return Math.round(parseFloat(m[1]) * 1_000_000);
+              if (k) return Math.round(parseFloat(k[1]) * 1_000);
+              const n = Number(lower.replace(/[^0-9.]/g, ""));
+              return Number.isFinite(n) ? Math.round(n) : null;
+            };
+            const parsePercentToNumber = (s: string): number | null => {
+              const m = s.match(/([-+]?\d+(?:\.\d+)?)\s*%?/);
+              if (!m) return null;
+              const n = Number(m[1]);
+              return Number.isFinite(n) ? n : null;
+            };
 
-              // 1) Targeted pattern allowing determiners between preposition and number (e.g., "on a 500,000 home")
-              const targeted = userText.match(/(?:home|house|property|mortgage)\b[^\d$]{0,40}?\$?([\d,.]+\s*[kKmM]?)/i)
-                || userText.match(/\$\s*([\d,.]+\s*[kKmM]?)/i)
-                || userText.match(/([\d,.]+\s*[kKmM]?)\s*(?:home|house|property|mortgage)\b/i);
-
-              const tryAssign = (raw: string | null | undefined) => {
+            // Home value (price) inference
+            if (args.home_value == null) {
+              const priceTarget = userText.match(/(?:home|house|property|mortgage|price|home\s*price|purchase\s*price|listing|cost)\b[^\d%$]{0,40}?\$?([\d.,]+\s*[kKmM]?)/i)
+                || userText.match(/\$\s*([\d.,]+\s*[kKmM]?)/i)
+                || userText.match(/([\d.,]+\s*[kKmM]?)\s*(?:home|house|property|mortgage|price)\b/i);
+              const tryAssignHome = (raw?: string | null) => {
                 if (!raw) return false;
                 const parsed = parseAmountToNumber(raw);
                 if (parsed && parsed >= 50_000 && parsed <= 100_000_000) {
                   args.home_value = parsed;
-                  console.log("[Inference] home_value inferred from user text", { home_value: parsed, source: userText });
+                  console.log("[Inference] home_value", { value: parsed, source: userText });
                   return true;
                 }
                 return false;
               };
-
               let assigned = false;
-              if (targeted && targeted[1]) {
-                assigned = tryAssign(targeted[1]);
-              }
-
-              // 2) Fallback: scan for any plausible amount near keywords within a small window
+              if (priceTarget && priceTarget[1]) assigned = tryAssignHome(priceTarget[1]);
               if (!assigned) {
-                const keywordRe = /(home|house|property|mortgage)/i;
+                const priceKw = /(home|house|property|mortgage|price|listing|cost)/i;
                 const amountRe = /\$?\b(\d{1,3}(?:[.,]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?\s*[kKmM]?)\b/g;
                 let match: RegExpExecArray | null;
                 while ((match = amountRe.exec(userText)) !== null) {
                   const start = Math.max(0, match.index - 40);
                   const end = Math.min(userText.length, amountRe.lastIndex + 40);
                   const windowText = userText.slice(start, end);
-                  if (keywordRe.test(windowText)) {
-                    if (tryAssign(match[1])) { assigned = true; break; }
-                  }
+                  if (priceKw.test(windowText) && tryAssignHome(match[1])) { break; }
+                }
+              }
+            }
+
+            // Down payment inference
+            if (args.down_payment_value == null) {
+              const downTarget = userText.match(/(?:down\s*payment|down\b|dp\b)\b[^\d%$]{0,40}?\$?([\d.,]+\s*[kKmM]?)/i)
+                || userText.match(/\$\s*([\d.,]+\s*[kKmM]?)\s*(?:down\s*payment|down\b|dp\b)/i);
+              const tryAssignDown = (raw?: string | null) => {
+                if (!raw) return false;
+                const parsed = parseAmountToNumber(raw);
+                if (parsed && parsed >= 0 && parsed <= 50_000_000) {
+                  args.down_payment_value = parsed;
+                  console.log("[Inference] down_payment_value", { value: parsed, source: userText });
+                  return true;
+                }
+                return false;
+              };
+              let assignedDown = false;
+              if (downTarget && downTarget[1]) assignedDown = tryAssignDown(downTarget[1]);
+              if (!assignedDown) {
+                const downKw = /(down\s*payment|down\b|dp\b)/i;
+                const amountRe = /\$?\b(\d{1,3}(?:[.,]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?\s*[kKmM]?)\b/g;
+                let match: RegExpExecArray | null;
+                while ((match = amountRe.exec(userText)) !== null) {
+                  const start = Math.max(0, match.index - 40);
+                  const end = Math.min(userText.length, amountRe.lastIndex + 40);
+                  const windowText = userText.slice(start, end);
+                  if (downKw.test(windowText) && tryAssignDown(match[1])) { break; }
+                }
+              }
+            }
+
+            // Rate (APR) inference
+            if (args.rate_apr == null) {
+              const rateTarget = userText.match(/(?:interest(?:\s*rate)?|rate|apr)\b[^\d%]{0,40}?([-+]?\d+(?:\.\d+)?\s*%?)/i)
+                || userText.match(/([-+]?\d+(?:\.\d+)?)\s*%\s*(?:interest(?:\s*rate)?|rate|apr)/i);
+              const tryAssignRate = (raw?: string | null) => {
+                if (!raw) return false;
+                const parsed = parsePercentToNumber(raw);
+                if (parsed != null && parsed >= 0 && parsed <= 50) {
+                  args.rate_apr = parsed;
+                  console.log("[Inference] rate_apr", { value: parsed, source: userText });
+                  return true;
+                }
+                return false;
+              };
+              let assignedRate = false;
+              if (rateTarget && rateTarget[1]) assignedRate = tryAssignRate(rateTarget[1]);
+              if (!assignedRate) {
+                const rateKw = /(interest|apr|rate)/i;
+                const percentRe = /([-+]?\d+(?:\.\d+)?)\s*%/g;
+                let m: RegExpExecArray | null;
+                while ((m = percentRe.exec(userText)) !== null) {
+                  const start = Math.max(0, m.index - 40);
+                  const end = Math.min(userText.length, percentRe.lastIndex + 40);
+                  const windowText = userText.slice(start, end);
+                  if (rateKw.test(windowText) && tryAssignRate(m[0])) { break; }
                 }
               }
             }

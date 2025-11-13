@@ -2801,7 +2801,7 @@
         };
 
         // Read parameters from ChatGPT tool call if available (only take defined values)
-        const toolOutput = window?.openai?.toolOutput;
+        const toolOutput = window?.openai?.toolOutput ?? window?.openai?.structuredContent ?? null;
         const providedParams = (() => {
           if (!toolOutput) return {};
           const out = {};
