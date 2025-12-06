@@ -1420,41 +1420,6 @@ async function handleTrackEvent(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
-// Turnstile verification
-async function verifyTurnstile(token: string): Promise<boolean> {
-  const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY;
-  
-  // Accept fallback tokens when Turnstile fails to load (e.g., in iframes)
-  if (token === 'auto-verified-fallback' || token === 'error-fallback' || token === 'render-error-fallback') {
-    console.warn(`Turnstile fallback used: ${token}`);
-    return true; // Allow subscription to proceed
-  }
-  
-  if (!TURNSTILE_SECRET_KEY) {
-    console.error("TURNSTILE_SECRET_KEY not set in environment variables");
-    return false;
-  }
-
-  try {
-    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        secret: TURNSTILE_SECRET_KEY,
-        response: token,
-      }),
-    });
-
-    const data = await response.json();
-    return data.success === true;
-  } catch (error) {
-    console.error('Turnstile verification error:', error);
-    return false;
-  }
-}
-
 // Buttondown API integration
 async function subscribeToButtondown(email: string, settlementId: string, settlementName: string, deadline: string | null) {
   const BUTTONDOWN_API_KEY = process.env.BUTTONDOWN_API_KEY;
@@ -1598,7 +1563,7 @@ async function handleSubscribe(req: IncomingMessage, res: ServerResponse) {
       body += chunk;
     }
 
-    const { email, settlementId, settlementName, deadline, turnstileToken } = JSON.parse(body);
+    const { email, settlementId, settlementName, deadline } = JSON.parse(body);
 
     if (!email || !email.includes("@")) {
       res.writeHead(400).end(JSON.stringify({ error: "Invalid email address" }));
@@ -1607,18 +1572,6 @@ async function handleSubscribe(req: IncomingMessage, res: ServerResponse) {
 
     if (!settlementId || !settlementName) {
       res.writeHead(400).end(JSON.stringify({ error: "Missing required fields" }));
-      return;
-    }
-
-    // Verify Turnstile token
-    if (!turnstileToken) {
-      res.writeHead(400).end(JSON.stringify({ error: "Security verification required" }));
-      return;
-    }
-
-    const isValidToken = await verifyTurnstile(turnstileToken);
-    if (!isValidToken) {
-      res.writeHead(400).end(JSON.stringify({ error: "Security verification failed. Please try again." }));
       return;
     }
 
