@@ -420,7 +420,7 @@ function widgetMeta(widget: MortgageWidget, bustCache: boolean = false) {
 const widgets: MortgageWidget[] = [
   {
     id: "mortgage-calculator",
-    title: "Mortgage Calculator – Live Rates, Payment Breakdown & Amortization Explorer",
+    title: "The Homebuyer’s Mortgage Analyzer – Live Rates, Payment Breakdown & Amortization Explorer",
     templateUri: `ui://widget/mortgage-calculator.html?v=${Date.now()}`,
     invoking:
       "Opening the interactive mortgage calculator with live mortgage-rate badge and detailed payment analytics...",
