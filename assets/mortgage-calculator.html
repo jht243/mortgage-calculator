@@ -1737,12 +1737,12 @@
                     </label>
                     <label>
                       Home value ($)
-                      <input type="number" id="home_value" min="0" step="1000" />
+                      <input type="text" id="home_value" inputmode="numeric" pattern="[0-9,]*" maxlength="12" placeholder="e.g. 600,000" />
                       <span class="field-message" data-field-error="home_value"></span>
                     </label>
                     <label>
                       Down payment ($)
-                      <input type="number" id="down_payment_value" min="0" step="1000" />
+                      <input type="text" id="down_payment_value" inputmode="numeric" pattern="[0-9,]*" maxlength="12" placeholder="e.g. 120,000" />
                       <span class="field-message" data-field-error="down_payment_value"></span>
                       <div class="slider-row">
                         <input type="range" id="down_payment_slider" min="0" max="80" step="1" aria-label="Down payment percent" />
@@ -1816,7 +1816,7 @@
                             <span class="tip-range">Typical range: $800–$2,500 per year (≈0.2%–0.5% of value)</span>
                           </div></span></span>
                           <span class="field-helper">Annual cost in dollars</span>
-                          <input type="number" id="homeowners_insurance_yearly" min="0" step="50" />
+                          <input type="text" id="homeowners_insurance_yearly" inputmode="numeric" pattern="[0-9,]*" maxlength="12" placeholder="e.g. 1,500" />
                         </label>
                         <label class="has-tip">
                           <span class="label-row">HOA dues <span class="info-wrap"><button type="button" class="info-trigger" aria-label="What is this?" title="What is this?">i</button><div class="info-bubble" role="tooltip">
@@ -1825,7 +1825,7 @@
                             <span class="tip-range">Typical range: $0–$600 per month (many condos $200–$400)</span>
                           </div></span></span>
                           <span class="field-helper">Monthly cost in dollars</span>
-                          <input type="number" id="hoa_monthly" min="0" step="10" />
+                          <input type="text" id="hoa_monthly" inputmode="numeric" pattern="[0-9,]*" maxlength="12" placeholder="e.g. 250" />
                         </label>
                       </div>
                     </div>
@@ -1886,7 +1886,7 @@
                         <label>
                           Extra payment
                           <span class="field-helper">Additional monthly principal</span>
-                          <input type="number" id="extra_principal_monthly" min="0" step="50" />
+                          <input type="text" id="extra_principal_monthly" inputmode="numeric" pattern="[0-9,]*" maxlength="12" placeholder="e.g. 200" />
                         </label>
                         <label>
                           Extra starts at month
@@ -2098,7 +2098,8 @@
         const ZERO_TOLERANCE = 1e-8;
 
         const toNumber = (value) => {
-          const num = Number(value);
+          const cleaned = String(value ?? "").replace(/[$,\s]/g, "");
+          const num = Number(cleaned);
           return Number.isFinite(num) ? num : 0;
         };
 
@@ -2484,6 +2485,10 @@
         globalThis.mortgageCalculator = mortgageCalculator;
 
         const $ = (id) => document.getElementById(id);
+        const formatNumber = (value) =>
+          clampNonNegative(value).toLocaleString(undefined, {
+            maximumFractionDigits: 0,
+          });
         const formatCurrency = (value) =>
           clampNonNegative(value).toLocaleString(undefined, {
             style: "currency",
@@ -2559,6 +2564,34 @@
           va_disabled_veteran: $("va_disabled_veteran"),
           extra_principal_monthly: $("extra_principal_monthly"),
           extra_start_month_index: $("extra_start_month_index"),
+        };
+
+        const currencyInputIds = new Set([
+          "home_value",
+          "down_payment_value",
+          "homeowners_insurance_yearly",
+          "hoa_monthly",
+          "extra_principal_monthly",
+        ]);
+
+        const stripNumberFormatting = (value) => String(value ?? "").replace(/[$,\s]/g, "");
+        const formatCurrencyInput = (el) => {
+          if (!el) return;
+          const raw = stripNumberFormatting(el.value);
+          if (raw === "") {
+            el.value = "";
+            return;
+          }
+          const n = Number(raw);
+          if (!Number.isFinite(n)) return;
+          el.value = formatNumber(n);
+        };
+        const unformatCurrencyInput = (el) => {
+          if (!el) return;
+          el.value = stripNumberFormatting(el.value);
+        };
+        const formatAllCurrencyInputs = () => {
+          currencyInputIds.forEach((id) => formatCurrencyInput(inputs[id]));
         };
 
         // State-based property tax rates (annual % of home value) and insurance estimates
@@ -2675,6 +2708,7 @@
           if (currentIns === 0 || currentIns === 1500) {
             const insuranceEstimate = Math.round(homeValue * (est.insurancePct / 100));
             inputs.homeowners_insurance_yearly.value = insuranceEstimate;
+            formatCurrencyInput(inputs.homeowners_insurance_yearly);
           }
         };
 
@@ -2890,6 +2924,7 @@
               inputs[key].value = percentInputSet.has(key) ? formatPercentValue(value) : value;
             }
           });
+          formatAllCurrencyInputs();
           normalizePercentInputs();
           updateMiVisibility();
           clearFieldErrors();
@@ -2909,6 +2944,7 @@
               inputs[key].value = percentInputSet.has(key) ? formatPercentValue(value) : value;
             }
           });
+          formatAllCurrencyInputs();
           normalizePercentInputs();
         };
 
@@ -3169,10 +3205,12 @@
             const monthlyIns = toNumber(breakdownInputs.ins.value);
             const yearlyIns = monthlyIns * 12;
             inputs.homeowners_insurance_yearly.value = Math.round(yearlyIns);
+            formatCurrencyInput(inputs.homeowners_insurance_yearly);
           }
           
           if (breakdownInputs.hoa && inputs.hoa_monthly) {
             inputs.hoa_monthly.value = Math.round(toNumber(breakdownInputs.hoa.value));
+            formatCurrencyInput(inputs.hoa_monthly);
           }
         };
 
@@ -3517,6 +3555,7 @@
             mergeProgramDefaults();
             updateVaDisabledVeteranVisibility();
           }
+          formatAllCurrencyInputs();
           updateSliderPositions();
           calculateAndRender();
         };
@@ -3550,6 +3589,7 @@
           const hv = toNumber(inputs.home_value.value);
           const pct = Number(sliders.down_payment.value) / 100;
           inputs.down_payment_value.value = Math.round(hv * pct);
+          formatCurrencyInput(inputs.down_payment_value);
           if (sliderDisplays.down_payment) sliderDisplays.down_payment.textContent = `${sliders.down_payment.value}%`;
           calculateAndRender();
         });
@@ -3578,7 +3618,19 @@
             calculateAndRender();
           };
           el.addEventListener("change", handler);
-          if (el.tagName === "INPUT" && el.type === "number") {
+          if (currencyInputIds.has(el.id)) {
+            el.addEventListener("focus", () => unformatCurrencyInput(el));
+            el.addEventListener("blur", () => {
+              formatCurrencyInput(el);
+              handler();
+            });
+            el.addEventListener("keyup", (evt) => {
+              if (evt.key === "Enter") {
+                formatCurrencyInput(el);
+                handler();
+              }
+            });
+          } else if (el.tagName === "INPUT" && el.type === "number") {
             el.addEventListener("keyup", (evt) => {
               if (evt.key === "Enter") handler();
             });
